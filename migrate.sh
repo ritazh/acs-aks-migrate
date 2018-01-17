@@ -8,7 +8,7 @@ echo "AZURE_TENANT_ID: $AZURE_TENANT_ID"
 echo "AZURE_CLIENT_ID: $AZURE_CLIENT_ID"
 echo "AZURE_CLIENT_SECRET: $AZURE_CLIENT_SECRET"
 echo "DESTINATION_CLUSTERNAME: $DESTINATION_CLUSTERNAME"
-echo "DESTINATION_RESOURCEGROUP: $DESTINATION_RESOURCEGROUP"
+echo "DESTINATION_ACS_RESOURCEGROUP: $DESTINATION_ACS_RESOURCEGROUP"
 echo "DESTINATION_STORAGEACCOUNT: $DESTINATION_STORAGEACCOUNT"
 echo "DESTINATION_STORAGEACCOUNT_CONTAINER: $DESTINATION_STORAGEACCOUNT_CONTAINER"
 echo "DESTINATION_MANAGED_DISK: $DESTINATION_MANAGED_DISK"
@@ -45,8 +45,8 @@ if [ -z "$DESTINATION_CLUSTERNAME" ]; then
   exit 0
 fi
 
-if [ -z "$DESTINATION_RESOURCEGROUP" ]; then
-  echo "Error: Missing env var for DESTINATION_RESOURCEGROUP"
+if [ -z "$DESTINATION_ACS_RESOURCEGROUP" ]; then
+  echo "Error: Missing env var for DESTINATION_ACS_RESOURCEGROUP"
   exit 0
 fi
 
@@ -75,6 +75,7 @@ if [ -z "$SOURCE_STORAGEACCOUNT_CONTAINER" ]; then
   exit 0
 fi
 
+DESTINATION_RESOURCEGROUP='$DESTINATION_ACS_RESOURCEGROUP_$DESTINATION_CLUSTERNAME_$DESTINATION_CLUSTERNAME_LOCATION'
 # if [ -z "$SOURCE_SNAPSHOT" ]; then
 #   echo "Error: Missing env var for SOURCE_SNAPSHOT"
 #   exit 0
@@ -98,10 +99,10 @@ else
 fi
 
 echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
-az acs create -g $z -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location westus2 --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
+az acs create -g $z -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location $DESTINATION_CLUSTERNAME_LOCATION --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
 
 echo "Creating storage account $DESTINATION_STORAGEACCOUNT"
-az storage account create -n $DESTINATION_STORAGEACCOUNT -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' -l westus2 --sku Standard_LRS
+az storage account create -n $DESTINATION_STORAGEACCOUNT -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' -l $DESTINATION_CLUSTERNAME_LOCATION --sku Standard_LRS
 DESTINATION_STORAGEACCOUNT_KEY=$(az storage account keys list -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' -n $DESTINATION_STORAGEACCOUNT | jq -r '.[0].value')
 echo "Storage account key: $DESTINATION_STORAGEACCOUNT_KEY"
 
