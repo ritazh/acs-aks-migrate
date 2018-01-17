@@ -1,0 +1,57 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: busybox
+  name: busybox
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: busybox
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: busybox
+    spec:
+      containers:
+      - args:
+        - sleep 60000
+        command:
+        - /bin/sh
+        - -c
+        - --
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: Always
+        name: busybox
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data
+          name: mydisk
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: mydisk
+      {{- if .Values.enablemigration }}
+        azureDisk:
+          cachingMode: ReadWrite
+          diskName: {{ .Values.disk.name }}
+          diskURI: {{ .Values.disk.uri }}
+          fsType: ext4
+          kind: Managed
+          readOnly: false
+      {{- else }}
+        persistentVolumeClaim:
+          claimName: myclaim
+      {{- end }}

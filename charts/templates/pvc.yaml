@@ -1,0 +1,17 @@
+{{- if not .Values.enablemigration }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    provisioner: kubernetes.io/azure-disk
+    storageclass.beta.kubernetes.io/is-default-class: 'true'
+    volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/azure-disk
+  name: myclaim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: managed-premium
+{{- end }}
