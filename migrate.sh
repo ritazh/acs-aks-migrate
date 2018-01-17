@@ -18,6 +18,8 @@ echo "SOURCE_STORAGEACCOUNT_CONTAINER: $SOURCE_STORAGEACCOUNT_CONTAINER"
 echo "SOURCE_STORAGEACCOUNT: $SOURCE_STORAGEACCOUNT"
 echo "SOURCE_STORAGEACCOUNT_KEY: $SOURCE_STORAGEACCOUNT_KEY"
 
+SSHKEY_FILEPATH=~/.ssh/acsmigrate
+
 if [ -z "$AZURE_SUBSCRIPTION_ID" ]; then
   echo "Error: Missing env var for AZURE_SUBSCRIPTION_ID"
   exit 0
@@ -88,11 +90,15 @@ if [ -z "$SOURCE_STORAGEACCOUNT_KEY" ]; then
   exit 0
 fi
 
-echo "Generating new ssh key"
-ssh-keygen -t rsa -b 4096 -C "acs@migrate.com" -f ~/.ssh/acsmigrate
+if [ -f $SSHKEY_FILEPATH ]; then
+  echo "ssh key $SSHKEY_FILEPATH for migration already exists...skip creating ssh key"
+else
+  echo "Generating new ssh key $SSHKEY_FILEPATH"
+  ssh-keygen -t rsa -b 4096 -C "acs@migrate.com" -f $SSHKEY_FILEPATH
+fi
 
 echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
-az acs create -g $z -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value ~/.ssh/acsmigrate --dns-prefix azure-$DESTINATION_CLUSTERNAME --location westus2 --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
+az acs create -g $z -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location westus2 --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
 
 echo "Creating storage account $DESTINATION_STORAGEACCOUNT"
 az storage account create -n $DESTINATION_STORAGEACCOUNT -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' -l westus2 --sku Standard_LRS
