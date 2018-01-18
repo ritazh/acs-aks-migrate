@@ -25,15 +25,6 @@ if [ ! $DESTINATION_RESOURCEGROUP_REGION ]; then
   exit 1
 fi
 
-# Make sure user gets a snapshot warning & wants to proceed
-echo -e "\nWARNING!\nThis script will take a snapshot of your VHDs before creating managed disks. All writes received after the snapshot is taken will remain in the VHD but will not be present in the managed disk. We recommend stopping writes, or if not possible, syncing data from the VHD to the managed disk after it has been mounted (via sftp, rsync, etc)\n"
-echo -e "\nWARNING!\nIf your VHDs are in a storage account with a different region than your destination resource group, this script will copy them across a regions. This operation will incur outbound data charges\n"
-read -r -p "Are you sure? [y/N] " response
-if ! [[ $response =~ ^[yY]$ ]]; then
-  echo "VHD migration canceled"
-  exit 0
-fi
-
 # Create blob snapshot of VHDs
 VHD_REGEX='https://(.*).blob.core.windows.net/(.*)/(.*)'
 
@@ -44,12 +35,22 @@ echo "There are $DISKCOUNT disks to migrate"
 for (( i=0; i<$DISKCOUNT; i++))
 do
   VHD=${DISKS[$i]}
+
+  # Make sure user gets a snapshot warning & wants to proceed
+  echo -e "\nWARNING!\nThis script will take a snapshot of your VHD before creating managed disks. All writes received after the snapshot is taken will remain in the VHD but will not be present in the managed disk. We recommend stopping writes, or if not possible, syncing data from the VHD to the managed disk after it has been mounted (via sftp, rsync, etc)\n"
+  echo -e "\nWARNING!\nIf your VHD is in a storage account with a different region than your destination resource group, this script will copy them across a regions. This operation will incur outbound data charges\n"
+  read -r -p "Do you want to migrate $VHD? [y/N] " response
+  if ! [[ $response =~ ^[yY]$ ]]; then
+    echo "Skipping $VHD"
+    continue
+  fi
+
   if [[ $VHD =~ $VHD_REGEX ]]; then
     SOURCE_STORAGEACCOUNT=${BASH_REMATCH[1]}
     SOURCE_STORAGEACCOUNT_CONTAINER=${BASH_REMATCH[2]}
     SOURCE_BLOB=${BASH_REMATCH[3]]}
   else
-    echo "Could not parse storage account information for $VHD"
+    echo "Could not parse storage account information. Skipping $VHD"
     continue
   fi
 
