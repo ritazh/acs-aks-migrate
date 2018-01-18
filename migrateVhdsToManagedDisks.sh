@@ -38,7 +38,10 @@ fi
 VHD_REGEX='https://(.*).blob.core.windows.net/(.*)/(.*)'
 
 DISKS=($SOURCE_VHD_PATHS)
-for (( i=0; i<${#DISKS[@]}; i++))
+DISKCOUNT=${#DISKS[@]}
+echo "There are $DISKCOUNT disks to migrate"
+
+for (( i=0; i<$DISKCOUNT; i++))
 do
   VHD=${DISKS[$i]}
   if [[ $VHD =~ $VHD_REGEX ]]; then
@@ -72,7 +75,7 @@ do
       # Create dynamically named storage account to copy blob
       #TODO: allow specifying temp storage acct
       echo "Creating storage account $DESTINATION_STORAGEACCOUNT"
-      DESTINATION_STORAGEACCOUNT="vhdmigration$(cat /proc/sys/kernel/random/uuid | cut -d '-' -f5)"
+      DESTINATION_STORAGEACCOUNT="vhdmigration$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z0-9' | fold -w 10 | head -n 1)"
       az storage account create -n $DESTINATION_STORAGEACCOUNT -g $DESTINATION_RESOURCEGROUP -l $DESTINATION_RESOURCEGROUP_REGION --sku Standard_LRS
       DESTINATION_STORAGE_ACCOUNT_CREATED=true
       DESTINATION_STORAGEACCOUNT_KEY=$(az storage account keys list -g $DESTINATION_RESOURCEGROUP -n $DESTINATION_STORAGEACCOUNT --query '[0].value' -o tsv)
