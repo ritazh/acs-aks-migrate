@@ -1,5 +1,18 @@
 #!/bin/bash
 #
+
+if [ -z $KUBECONFIG ]; then
+  echo "Error: Missing env var for KUBECONFIG"
+  exit 0
+fi
+
+echo -e "Before continuing, please make sure your current KUBECONFIG is set to the source cluster:\n\n $KUBECONFIG\n"
+read -r -p "Is this the correct config? [y/N] " response
+if ! [[ $response =~ ^[yY]$ ]]; then
+  echo "Please set your KUBECONFIG to correct config and rerun this script."
+  exit 0
+fi 
+
 echo $(date +"%F %T%z") "- Starting script migrate.sh"
 
 # Get values for this script
@@ -75,7 +88,6 @@ if [ -z "$SOURCE_STORAGEACCOUNT_CONTAINER" ]; then
   exit 0
 fi
 
-DESTINATION_RESOURCEGROUP='$DESTINATION_ACS_RESOURCEGROUP_$DESTINATION_CLUSTERNAME_$DESTINATION_CLUSTERNAME_LOCATION'
 # if [ -z "$SOURCE_SNAPSHOT" ]; then
 #   echo "Error: Missing env var for SOURCE_SNAPSHOT"
 #   exit 0
@@ -98,27 +110,18 @@ else
   ssh-keygen -t rsa -b 4096 -C "acs@migrate.com" -f $SSHKEY_FILEPATH
 fi
 
+EXIST=$(az acs list -g $DESTINATION_ACS_RESOURCEGROUP | grep $DESTINATION_CLUSTERNAME)
+if [ -z $EXIST ]; then
+  echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
+  az acs create -g $DESTINATION_ACS_RESOURCEGROUP -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location $DESTINATION_CLUSTERNAME_LOCATION --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
+else
+  echo "Cluster $DESTINATION_CLUSTERNAME already exists"
+fi
+
+DESTINATION_RESOURCEGROUP='$DESTINATION_ACS_RESOURCEGROUP_$DESTINATION_CLUSTERNAME_$DESTINATION_CLUSTERNAME_LOCATION'
 # Assuming KUBECONFIG is set to source cluster
-DISK_URIS=$(kubectl get pv -o json | jq -r '.items[].spec.azureDisk.diskURI')
+DISK_URIS=$(kubectl get pv -o json | jq -r '.items[].spec.azureDisk.diskURI' | grep http)
 
-echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
-az acs create -g $z -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location $DESTINATION_CLUSTERNAME_LOCATION --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
-
-echo "Creating storage account $DESTINATION_STORAGEACCOUNT"
-az storage account create -n $DESTINATION_STORAGEACCOUNT -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' -l $DESTINATION_CLUSTERNAME_LOCATION --sku Standard_LRS
-DESTINATION_STORAGEACCOUNT_KEY=$(az storage account keys list -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' -n $DESTINATION_STORAGEACCOUNT | jq -r '.[0].value')
-echo "Storage account key: $DESTINATION_STORAGEACCOUNT_KEY"
-
-echo "Creating container $DESTINATION_STORAGEACCOUNT_CONTAINER"
-az storage container create --name $DESTINATION_STORAGEACCOUNT_CONTAINER --account-key $DESTINATION_STORAGEACCOUNT_KEY --account-name $DESTINATION_STORAGEACCOUNT
-
-echo "Creating snapshot for vhd $SOURCE_BLOB"
-SOURCE_SNAPSHOT=$(az storage blob snapshot -c $SOURCE_STORAGEACCOUNT_CONTAINER -n $SOURCE_BLOB --account-name $SOURCE_STORAGEACCOUNT --account-key $SOURCE_STORAGEACCOUNT_KEY | jq -r '.snapshot')
-
-echo "Copying vhd snapshot $SOURCE_BLOB $SOURCE_SNAPSHOT"
-az storage blob copy start --source-blob $SOURCE_BLOB --source-container $SOURCE_STORAGEACCOUNT_CONTAINER --source-snapshot $SOURCE_SNAPSHOT -b $SOURCE_BLOB -c $DESTINATION_STORAGEACCOUNT_CONTAINER --source-account-name $SOURCE_STORAGEACCOUNT --source-account-key $SOURCE_STORAGEACCOUNT_KEY --account-name $DESTINATION_STORAGEACCOUNT --account-key $DESTINATION_STORAGEACCOUNT_KEY 
-
-echo "Creating Managed Disk from vhd $SOURCE_BLOB"
-az disk create -n $DESTINATION_MANAGED_DISK -g '$DESTINATION_RESOURCEGROUP_$DESTINATION_RESOURCEGROUP' --source http://$DESTINATION_STORAGEACCOUNT.blob.core.windows.net/$DESTINATION_STORAGEACCOUNT_CONTAINER/$SOURCE_BLOB
+bash migrateVhdsToManagedDisks.sh "$DISK_URIS" $DESTINATION_RESOURCEGROUP "output.log"
 
 echo $(date +"%F %T%z") " - Script complete"
