@@ -1,5 +1,5 @@
 # acs-aks-migrate
-⚒ Script to migrate from ACS Kubernetes clusters to ACS (RP v2 [regions](https://github.com/Azure/ACS/blob/master/acs_regional_avilability) ) or AKS cluster
+⚒ Script to migrate from ACS Kubernetes clusters to ACS (RP v2 [regions](https://github.com/Azure/ACS/blob/master/acs_regional_avilability)) or AKS cluster
 
 __USE IT AT YOUR OWN RISK - DO NOT USE IN PRODUCTION__
 
