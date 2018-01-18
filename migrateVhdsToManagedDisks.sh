@@ -54,9 +54,6 @@ do
   SOURCE_STORAGEACCOUNT_KEY=$(az storage account keys list -n $SOURCE_STORAGEACCOUNT -g $SOURCE_STORAGEACCOUNT_GROUP --query '[0].value' -o tsv)
   SOURCE_STORAGEACCOUNT_REGION=$(az storage account show -n $SOURCE_STORAGEACCOUNT -g $SOURCE_STORAGEACCOUNT_GROUP --query location -o tsv)
 
-  echo "Creating snapshot for vhd $SOURCE_BLOB"
-  SOURCE_SNAPSHOT=$(az storage blob snapshot -c $SOURCE_STORAGEACCOUNT_CONTAINER -n $SOURCE_BLOB --account-name $SOURCE_STORAGEACCOUNT --account-key $SOURCE_STORAGEACCOUNT_KEY --query snapshot -o tsv)
-
   # Detect region move (based on VHD storage acct and target RG name)
   if [[ $SOURCE_STORAGEACCOUNT_REGION != $DESTINATION_RESOURCEGROUP_REGION ]]; then 
     MIGRATE_REGIONS=true
@@ -65,6 +62,9 @@ do
   # When moving between regions, we need to copy the snapshot to a storage account in the destination region
   if [ "$MIGRATE_REGIONS" = true ]; then
     echo "Migrating from $SOURCE_STORAGEACCOUNT_REGION to $DESTINATION_RESOURCEGROUP_REGION"
+
+    echo "Creating snapshot for vhd $SOURCE_BLOB"
+    SOURCE_SNAPSHOT=$(az storage blob snapshot -c $SOURCE_STORAGEACCOUNT_CONTAINER -n $SOURCE_BLOB --account-name $SOURCE_STORAGEACCOUNT --account-key $SOURCE_STORAGEACCOUNT_KEY --query snapshot -o tsv)
     
     if [ "$DESTINATION_STORAGE_ACCOUNT_CREATED" = true ]; then
       echo "Destination storage account $DESTINATION_STORAGEACCOUNT already created"
@@ -104,7 +104,10 @@ do
       BLOB_COPY_STATUS=$(az storage blob show --account-name $DESTINATION_STORAGEACCOUNT --account-key $DESTINATION_STORAGEACCOUNT_KEY -c $DESTINATION_STORAGEACCOUNT_CONTAINER -n $SOURCE_BLOB --query 'properties.copy.status' -o tsv)
     done
   else
-    DESTINATION_MANAGED_DISK_SOURCE="https://$SOURCE_STORAGEACCOUNT.blob.core.windows.net/$SOURCE_STORAGEACCOUNT_CONTAINER/$SOURCE_BLOB?snapshot=$SOURCE_SNAPSHOT"
+    # 'az disk create' doesn't work with blob snapshots (by timestamp), but does work with top-level snapshot resources
+    # 'az disk create' interprets snapshots ending with .vhd as a malformed blob url, so we strip the suffix
+    SNAPSHOT_NAME=${SOURCE_BLOB%.vhd}
+    DESTINATION_MANAGED_DISK_SOURCE=$(az snapshot create -n $SNAPSHOT_NAME -g $SOURCE_STORAGEACCOUNT_GROUP --source "https://$SOURCE_STORAGEACCOUNT.blob.core.windows.net/$SOURCE_STORAGEACCOUNT_CONTAINER/$SOURCE_BLOB" --query 'id' -o tsv)
   fi
 
   # TODO: Handle disks that already exist (but possibly from an older snapshot)
@@ -118,4 +121,4 @@ do
 done
 
 # Cleanup temp files (copied blob if moving regions, remove snapshots)
-echo "ATTENTION!\nFor safety, this script doesn't delete anything. You'll need to do some cleanup to remove the temporary resources that were created. This includes blob snapshots in the source storage account(s) and temporary vhdmigration* storage accounts"
+echo -e "ATTENTION!\nFor safety, this script doesn't delete anything. You'll need to do some cleanup to remove the temporary resources that were created. This includes blob snapshots in the source storage account(s) and temporary vhdmigration* storage accounts"
