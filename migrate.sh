@@ -90,6 +90,11 @@ if [ -z "$SOURCE_STORAGEACCOUNT_KEY" ]; then
   exit 0
 fi
 
+if [ -z "$KUBECONFIG" ]; then
+  echo "Error: Missing env var for KUBECONFIG"
+  exit 0
+fi
+
 if [ -f $SSHKEY_FILEPATH ]; then
   echo "ssh key $SSHKEY_FILEPATH for migration already exists...skip creating ssh key"
 else
