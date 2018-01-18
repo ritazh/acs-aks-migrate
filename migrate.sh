@@ -99,7 +99,7 @@ else
 fi
 
 # Assuming KUBECONFIG is set to source cluster
-DISK_URIS=$(kubectl get pv -o json | jq -r '.items[].spec.azureDisk.diskURI')
+DISK_URIS=$(kubectl get pv -o json | jq -r '.items[].spec.azureDisk.diskURI' | grep http)
 
 echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
 az acs create -g $z -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location $DESTINATION_CLUSTERNAME_LOCATION --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
