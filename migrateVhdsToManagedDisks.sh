@@ -116,7 +116,7 @@ do
   # TODO: Handle disks that already exist (but possibly from an older snapshot)
   # Create managed disks from snapshot (or copied blob if moving regions) in new RG
   echo "Creating Managed Disk from vhd $SOURCE_BLOB"
-  DESTINATION_MANAGED_DISK=$SOURCE_BLOB     # Name the managed disk the same as the source blob
+  DESTINATION_MANAGED_DISK=${SOURCE_BLOB%.vhd}     # Name the managed disk the same as the source blob
   DESTINATION_MANAGED_DISK_ID=$(az disk create -n $DESTINATION_MANAGED_DISK -g $DESTINATION_RESOURCEGROUP --source $DESTINATION_MANAGED_DISK_SOURCE --query 'id' -o tsv)
 
   # Write map of VHD->managed disk to OUTPUT_FILE_PATH
