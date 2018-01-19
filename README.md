@@ -34,22 +34,25 @@ https://<SOURCE_STORAGE>.blob.core.windows.net/<SOURCE_CONTAINER>/<SOURCE_BLOB>/
 ```
 
 Update your app Helm Chart to include `enablemigration`
+You can also take a look at the [sample Helm chart in this repo](https://github.com/ritazh/acs-aks-migrate/tree/master/charts) to see how to update your own app.
 
 1. Update your deployment.yaml to conditionally mount disks depending on the `enablemigration` field in the `values.yaml` to mount the new managed disk created by the previous step OR to use the PVC to create a disk dynamically.
 
 ```yaml
-{{- if .Values.enablemigration }}
-	azureDisk:
-	  cachingMode: ReadWrite
-	  diskName: {{ .Values.disk.name }}
-	  diskURI: {{ .Values.disk.uri }}
-	  fsType: ext4
-	  kind: Managed
-	  readOnly: false
-	{{- else }}
-	persistentVolumeClaim:
-	  claimName: myclaim
-{{- end }}
+      volumes:
+      - name: mydisk
+      {{- if .Values.enablemigration }}
+        azureDisk:
+          cachingMode: ReadWrite
+          diskName: {{ .Values.disk.name }}
+          diskURI: {{ .Values.disk.uri }}
+          fsType: ext4
+          kind: Managed
+          readOnly: false
+      {{- else }}
+        persistentVolumeClaim:
+          claimName: myclaim
+      {{- end }}
 ```
 
 2. Update your pvc.yaml to conditionally deploy only when the `enablemigration` field in the `values.yaml` is false.
