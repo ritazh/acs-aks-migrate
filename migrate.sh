@@ -53,12 +53,8 @@ if [ -z "$SOURCEKUBECONFIGPATH" ]; then
   exit 0
 fi
 
-if [ -f $SSHKEY_FILEPATH ]; then
-  echo "ssh key $SSHKEY_FILEPATH for migration already exists...skip creating ssh key"
-else
-  echo "Generating new ssh key $SSHKEY_FILEPATH"
-  ssh-keygen -t rsa -b 4096 -C "acs@migrate.com" -f $SSHKEY_FILEPATH
-fi
+az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+
 
 DESTINATION_RESOURCEGROUP_REGION=`az group show -n $DESTINATION_ACS_AKS_RESOURCEGROUP --query location -o tsv`
 if [ ! $DESTINATION_RESOURCEGROUP_REGION ]; then
@@ -70,6 +66,12 @@ if [ $DESTINATION_CLUSTERTYPE == "acs" ]; then
   EXIST=$(az acs list -g $DESTINATION_ACS_AKS_RESOURCEGROUP | grep $DESTINATION_CLUSTERNAME)
   if [ -z "$EXIST" ]; then
     echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
+    if [ -f $SSHKEY_FILEPATH ]; then
+      echo "ssh key $SSHKEY_FILEPATH for migration already exists...skip creating ssh key"
+    else
+      echo "Generating new ssh key $SSHKEY_FILEPATH"
+      ssh-keygen -t rsa -b 4096 -C "acs@migrate.com" -f $SSHKEY_FILEPATH
+    fi
     az acs create -g $DESTINATION_ACS_AKS_RESOURCEGROUP -n $DESTINATION_CLUSTERNAME --orchestrator-type Kubernetes --agent-count 2 --agent-osdisk-size 100 --agent-vm-size Standard_DS2_v2 --agent-storage-profile ManagedDisks --master-storage-profile ManagedDisks --ssh-key-value $SSHKEY_FILEPATH --dns-prefix azure-$DESTINATION_CLUSTERNAME --location $DESTINATION_RESOURCEGROUP_REGION --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
   else
     echo "Cluster $DESTINATION_CLUSTERNAME already exists"
@@ -80,6 +82,12 @@ else
     EXIST=$(az aks list -g $DESTINATION_ACS_AKS_RESOURCEGROUP | grep $DESTINATION_CLUSTERNAME)
     if [ -z "$EXIST" ]; then
       echo "Creating new destination cluster $DESTINATION_CLUSTERNAME with premium managed disks "
+      if [ -f $SSHKEY_FILEPATH ]; then
+        echo "ssh key $SSHKEY_FILEPATH for migration already exists...skip creating ssh key"
+      else
+        echo "Generating new ssh key $SSHKEY_FILEPATH"
+        ssh-keygen -t rsa -b 4096 -C "acs@migrate.com" -f $SSHKEY_FILEPATH
+      fi
       az aks create -g $DESTINATION_ACS_AKS_RESOURCEGROUP -n $DESTINATION_CLUSTERNAME -l $DESTINATION_RESOURCEGROUP_REGION --node-osdisk-size 100 --node-vm-size Standard_DS2_v2 --ssh-key-value $SSHKEY_FILEPATH --service-principal $AZURE_CLIENT_ID --client-secret $AZURE_CLIENT_SECRET
     else
       echo "Cluster $DESTINATION_CLUSTERNAME already exists"
